@@ -1,169 +1,84 @@
 # gpt2human
 
-一个 [pi](https://pi.dev) 扩展:自动把模型的最终回答改写成**清晰、像人话的输出**——只改显示、不改上下文。
+这是一个基于 [pi](https://github.com/earendil-works/pi) 的扩展插件。它的核心功能是：**调用成本较低的模型，将主模型生成的“AI 腔”回答重写为自然流畅的“人话”。**
 
-> 场景:你主用 `gpt-5.6-sol` 这类能力很强但输出"硅基味"很重的模型;再配一台便宜、会表达的小模型(如 `deepseek/deepseek-flash`)专门负责把最终回答"润"成人话。gpt2human 就是把这个流程自动化的插件。
+像 `gpt-5.6-sol` 这样的模型虽然推理能力出众，但输出文风往往带有浓厚的“硅基生物”味——充斥着 "let's dive into"、"robust"、"leverage" 等套话和难懂的专业黑话。gpt2human 会在主模型回答结束后，在后台静默调用你指定的润色模型（例如 `deepseek/deepseek-flash`）对文本进行重写，并且**仅替换屏幕上的显示内容**。
 
----
+## 核心设计：只改显示，不污染上下文
 
-## 功能特色
+重写的结果只作用于 Markdown 渲染层。Session 中保存的、以及后续发送给 LLM 的上下文消息，**始终是主模型的原始输出**。
 
-- 🔌 **独立配置 refine 模型**:润色模型与主对话模型完全解耦,可随时切换。
-- 🎨 **多套风格预设**:`Humanize`(默认)、`Concise`、`Friendly`、`Technical`、`Structured`,并支持**完全自定义提示词**(含 `{{text}}` 占位符)。
-- ⌨️ **一键切换**:`ctrl+shift+r` 在「原文 / 润色后」之间原地切换。
-- 🖥️ **纯显示层替换**:原始回答始终保留在会话与 LLM 上下文中,润色结果只用于终端渲染,不会污染后续追问,也不会改写代码/命令。
-- ⚡ **智能跳过**:只润色最终回答(带工具调用的中间轮次跳过),过短的碎句(如 "ok"、"马上")不处理。
-- 💾 **配置持久化**:配置保存在 `~/.pi/agent/gpt2human.json`,润色映射随会话持久化,`/reload` 后仍能恢复。
+这一点至关重要：如果将润色后的文本写回上下文，后续的追问就会基于这段被“美化”过的文本进行，极易导致代码、命令或文件路径被意外篡改。使用 gpt2human，**你看到的是通俗易懂的人话，而模型看到的依然是精准的原话**。
 
----
+💡 **快捷键：** 你可以随时按下 `Ctrl+Shift+R`，在原文和重写版之间无缝切换。
 
-## 工作原理
+## 安装指南
 
-gpt2human 监听 `message_end` 事件,在模型给出**最终回答**后,调用配置好的 refine 模型做一次改写;随后通过 pi 的 **markdown transformer** 把改写结果替换到终端显示上。因为 transformer 是纯显示层的,消息本身(原文)原封不动地保留在会话历史与 LLM 上下文里。
-
-```
-主模型回答(原文)
-      │
-      ▼
-message_end ──► 调用 refine 模型 ──► 得到"人话版"
-      │                                │
-      ▼                                ▼
-保留原文进上下文                markdown transformer 替换显示
-```
-
----
-
-## 安装
-
-### 方式一:作为 pi 包安装(推荐,发布到 GitHub 后)
+全局安装：
 
 ```bash
-# 用 git 地址安装(替换成你自己的仓库)
-pi install git:github.com/<your-name>/gpt2human@v1.0.0
-
-# 或安装本地目录
-pi install ~/Desktop/gpt2human
+pi install git:github.com/jay201368/gpt2human
 ```
 
-### 方式二:手动安装(不发布也能用)
-
-把扩展文件放进 pi 的全局扩展目录(或软链接过去):
+若只想在当前项目中局部使用，请添加 `-l` 参数：
 
 ```bash
-mkdir -p ~/.pi/agent/extensions/gpt2human
-cp extensions/gpt2human.ts ~/.pi/agent/extensions/gpt2human/index.ts
-
-# 或者用软链接,方便同步仓库里的更新
-ln -sf ~/Desktop/gpt2human/extensions/gpt2human.ts ~/.pi/agent/extensions/gpt2human/index.ts
+pi install git:github.com/jay201368/gpt2human -l
 ```
 
-### 方式三:临时试用
+**初始状态与认证：**
+安装完成后，插件默认开启，并默认使用 `deepseek/deepseek-flash` 进行重写。请确保你已经为该 Provider 配置了 API 认证（可通过 `pi auth` 检查）。若未配置，扩展会在首次提示“未配置认证”后，静默跳过后续的重写步骤。
 
-```bash
-pi -e ~/Desktop/gpt2human/extensions/gpt2human.ts
+## 使用方法与配置
+
+本插件开箱即用，几乎不需要配置。若需个性化调整，支持以下交互命令：
+
+```text
+/gpt2human                                 # 查看当前配置
+/gpt2human on | off                        # 开启 / 关闭插件
+/gpt2human model deepseek/deepseek-flash   # 切换重写模型
+/gpt2human style concise                   # 切换风格预设
+/gpt2human styles                          # 列出所有预设
+/gpt2human custom                          # 打开编辑器编写自定义 Prompt
 ```
 
-安装后,在 pi 里执行 `/reload`(或重启 pi)即可生效。
+*注：配置保存在 `~/.pi/agent/gpt2human.json`，手动修改文件同样即时生效。*
 
----
+## 风格预设 (Styles)
 
-## 快速开始
-
-1. 确保 refine 模型已配置好鉴权(例如 `pi auth` 或对应环境变量)。
-2. 默认使用 `deepseek/deepseek-flash` 作为润色模型、`Humanize` 预设。
-3. 直接对话:模型给出最终回答后,会先显示原文,片刻后自动换成"人话版"。
-4. 按 `ctrl+shift+r` 随时在原文与润色版之间来回切换;底部状态栏会以灰色小字显示当前状态(`gpt2human: Refined / Original`)。
-
----
-
-## 命令参考
-
-| 命令 | 说明 |
+| 预设名称 | 行为说明 |
 | --- | --- |
-| `/gpt2human` | 查看当前配置 |
-| `/gpt2human on` / `off` | 开启 / 关闭 |
-| `/gpt2human model <provider/id>` | 设置润色模型,例:`/gpt2human model deepseek/deepseek-flash` |
-| `/gpt2human style <preset>` | 切换风格预设,例:`/gpt2human style concise` |
-| `/gpt2human styles` | 列出所有预设 |
-| `/gpt2human custom` | 在编辑器里编写自定义提示词 |
+| `humanize` | **(默认)** 消除 AI 腔和术语堆砌，让表达更自然。若输出为中文，首次出现的英文术语会附带中文解释。 |
+| `concise` | 删减冗余信息，优先使用短句和列表（bullet points）。 |
+| `friendly` | 语气更轻松亲切，同时保持专业度。 |
+| `technical` | 仅理顺句子结构，严格保留术语的精准度。 |
+| `structured` | 结构化输出，拆分为清晰的标题、简短段落和列表。 |
+| `custom` | 使用你自定义的 Prompt。 |
 
-快捷键:
+**通用规则：** 所有预设都已在底层被要求：**严格保持事实、数字、代码、命令和文件路径原样不动**，并且跟随输入语言（即中文进中文出）。
 
-| 快捷键 | 说明 |
-| --- | --- |
-| `ctrl+shift+r` | 在「原文 / 润色后」之间切换 |
+**关于自定义提示词 (`custom`)：**
+支持两种书写方式：
+1. **带占位符**：如果文本中包含 `{{text}}`，它会被自动替换为原文，并将整段内容作为 User Message 发出。
+2. **不带占位符**：如果你没写 `{{text}}`，你编写的内容将自动作为 System Prompt，原文则作为 User Message 发出。
 
----
+## 触发条件与限制
 
-## 风格预设
+为了不拖慢 Agent 循环，也避免在流式输出时引发屏幕闪烁，gpt2human 在以下场景会**跳过**重写逻辑：
 
-| 预设 ID | 名称 | 效果 |
-| --- | --- | --- |
-| `humanize` | Humanize | 通俗、自然、像人话(默认),术语首次出现时附带简短解释 |
-| `concise` | Concise | 精简、易扫读,去冗余 |
-| `friendly` | Friendly | 温暖、口语化,但仍专业准确 |
-| `technical` | Technical | 面向技术读者,保留术语、结构更清晰 |
-| `structured` | Structured | 用标题、短段落、列表重新组织 |
-| `custom` | Custom | 使用你自己的提示词 |
+- **非 TUI 模式**：例如使用了 `--print` 参数，或输出 json、rpc 格式时。
+- **中间步骤**：当前对话轮次中带有 Tool Call 时（插件只重写最终的总结性答复）。
+- **文本过短**：原文字数少于 `minLength`（默认 30 个字符，避免对“好的”这种极短回复发起多余请求）。
+- **已重写过的文本**：重写结果会缓存在 session 中，重新打开会话时无需重复计算。
 
----
+*注：`minLength` 目前只能通过直接修改配置文件来调整，暂无对应的斜杠命令。*
 
-## 配置文件
+## 依赖项
 
-配置保存在 `~/.pi/agent/gpt2human.json`:
+本插件为 Peer Dependency，依赖宿主 `pi` 提供以下核心包：
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-ai`
 
-```json
-{
-  "enabled": true,
-  "model": "deepseek/deepseek-flash",
-  "style": "humanize",
-  "customPrompt": "",
-  "minLength": 30
-}
-```
+## 许可证 (License)
 
-| 字段 | 含义 |
-| --- | --- |
-| `enabled` | 是否启用 |
-| `model` | 润色模型,格式 `provider/modelId` |
-| `style` | 预设 ID(`humanize` / `concise` / `friendly` / `technical` / `structured` / `custom`) |
-| `customPrompt` | `style` 为 `custom` 时使用的提示词;含 `{{text}}` 时,`{{text}}` 会被替换为原文 |
-| `minLength` | 少于该字符数的文本块不润色,默认 30 |
-
----
-
-## 自定义提示词
-
-`/gpt2human custom` 会打开编辑器。提示词里可以用 `{{text}}` 占位原文:
-
-```
-把下面的内容改得通俗易懂、像正常人说话。保留所有事实、数字、代码、命令和文件路径。
-输出语言与输入保持一致。只输出改写后的内容。
-
-待改写内容:
-{{text}}
-```
-
-如果提示词中**不包含** `{{text}}`,则提示词会作为 system prompt,原文作为 user message 单独发送。
-
----
-
-## 常见问题
-
-**Q:为什么润色只发生在终端显示,不改上下文?**
-A:这是刻意的设计。如果直接替换消息内容,后续追问会基于"改写版"而非原文,代码、命令、精确措辞可能被破坏。显示层替换既能获得可读性,又保持上下文无损。
-
-**Q:润色模型需要单独配置鉴权吗?**
-A:需要。润色模型通过 pi 的模型注册表调用,请确保该模型已配置 API key(如 `pi auth` 或对应环境变量)。未配置时插件会给出一次性警告并跳过。
-
-**Q:为什么最终回答会有短暂的"原文 → 润色版"过渡?**
-A:为了确保两种版本都能稳定显示、并在 `/reload` 后恢复,润色是在 `message_end` 阶段同步完成的。通常只需 1 秒左右。
-
-**Q:支持哪些模型做润色?**
-A:任何 pi 已配置的模型都可以,格式为 `provider/modelId`。注意模型 ID 以实际目录为准(例如 DeepSeek 的轻量模型在目录里叫 `deepseek/deepseek-flash`,而不是 `deepseek-v4-flash`)。
-
----
-
-## 许可证
-
-[MIT](./LICENSE)
+MIT
