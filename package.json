@@ -1,0 +1,22 @@
+{
+  "name": "gpt2human",
+  "version": "1.0.0",
+  "description": "pi extension that automatically rewrites model output into clear, human-readable text (display-only refinement).",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "readability",
+    "refine",
+    "humanize"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./extensions/gpt2human.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-ai": "*"
+  }
+}
