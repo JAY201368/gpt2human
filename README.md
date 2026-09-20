@@ -1,6 +1,6 @@
 # gpt2human
 
-这是一个基于 [pi](https://github.com/earendil-works/pi) 的扩展插件。它的核心功能是：**调用成本较低的模型，将主模型生成的“AI 腔”回答重写为自然流畅的“人话”。**
+这是一个基于 [pi](https://github.com/earendil-works/pi) 的扩展插件。它的核心功能是：**调用成本较低的模型，将主模型生成的 AI 腔回答重写为自然流畅的人话。**
 
 像 `gpt-5.6-sol` 这样的模型虽然推理能力出众，但输出文风往往带有浓厚的“硅基生物”味——充斥着 "let's dive into"、"robust"、"leverage" 等套话和难懂的专业黑话。gpt2human 会在主模型回答结束后，在后台静默调用你指定的润色模型（例如 `deepseek/deepseek-flash`）对文本进行重写，并且**仅替换屏幕上的显示内容**。
 
